@@ -40,3 +40,5 @@ VALUES ('habr.com', 'TesT_stringHasH223', CURRENT_TIMESTAMP,  0, '44.75.21.76');
 select * from url_data_store;
 
 UPDATE url_data_store SET deleted = TRUE WHERE url_id between 2 and 5;
+
+select count(*) from users WHERE email ~ '\ygoogle\y';
