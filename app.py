@@ -1,6 +1,6 @@
 import os
 import psycopg2
-from flask import Flask
+from flask import Flask, jsonify
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import render_template
@@ -44,13 +44,21 @@ def select(conn, query: str, params=None, name=None, itersize=5000):
 
 @app.route('/')
 def index():
-    for item in select(connect(),
-                       'select * from url_data_store '
-                       'ORDER BY url_id ASC LIMIT {limit} OFFSET {offset};'.format(limit=100, offset=0)):
-        print(item[0])
-    return render_template('index.html', value='variable test ###')
+    con = None
+
+    try:
+        con = connect()
+        cur = con.cursor()
+        query = 'select * from url_data_store WHERE NOT deleted ORDER BY id ' \
+                'ASC LIMIT {limit} OFFSET {offset};'.format(limit=100, offset=0)
+        cur.execute(query)
+        data = cur.fetchall()
+    finally:
+        if con:
+            con.close()
+
+    return render_template('index.html', value='variable test', url_data=data)
 
 
 if __name__ == '__main__':
     app.run()
-
