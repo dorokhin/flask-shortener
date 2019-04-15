@@ -9,9 +9,45 @@ import os
 env_path = Path('.') / '.env'
 load_dotenv(dotenv_path=env_path)
 
-
+NUM_OF_USERS = 10
 USER_NAMES = ['Armin', 'Mike', 'Terminator', 'Predator']
 MAIL_DOMAINS = ['google.com', 'outlook.com', 'amazon.com']
+SQL_ = ['DROP TABLE IF EXISTS users CASCADE;',
+        """
+            CREATE TABLE users(
+                id SERIAL PRIMARY KEY, 
+                username VARCHAR (100) NOT NULL, 
+                password VARCHAR (100) NOT NULL, 
+                email VARCHAR (70) NOT NULL UNIQUE, 
+                created_on TIMESTAMP NOT NULL, 
+                updated_on TIMESTAMP NOT NULL, 
+                deleted BOOLEAN,
+                is_admin BOOLEAN
+            );
+        """,
+        'DROP TABLE IF EXISTS url_data_store;',
+        """
+            CREATE TABLE url_data_store(
+                 id SERIAL PRIMARY KEY,
+                 url_hash VARCHAR (20) NOT NULL,
+                 url VARCHAR (300) NOT NULL,
+                 created_on TIMESTAMP NOT NULL,
+                 viewed INT NOT NULL CHECK (viewed >= 0),
+                 "user" INT references users(ID),
+                 ip_address INET,
+                 deleted BOOLEAN
+            );
+        """]
+
+
+def connect(host=None, database=None, user=None, password=None, **kwargs):
+
+    host = host or os.environ['POSTGRESQL_HOST']
+    database = database or os.environ['POSTGRESQL_DB']
+    user = user or os.environ['POSTGRESQL_USER']
+    password = password or os.environ['POSTGRESQL_PASSWORD']
+
+    return psycopg2.connect(host=host, database=database, user=user, password=password, **kwargs)
 
 
 def generate_birth_date():
@@ -48,64 +84,36 @@ def generate_users(user_count):
             'created_on': datetime.now(),
             'updated_on': datetime.now(),
             'deleted': False,
-            'is_admin': False
+            'is_admin': True
         }
         yield user
 
 
-def create_db_table():
+def create_db_table(sql):
     """
-    TODO: move psycopg2.connect to db_utils
     :return:
     """
-    host = os.environ['POSTGRESQL_HOST']
-    database = os.environ['POSTGRESQL_DB']
-    user = os.environ['POSTGRESQL_USER']
-    password = os.environ['POSTGRESQL_PASSWORD']
-
     con = None
-
     try:
-        con = psycopg2.connect(host=host, database=database, user=user, password=password)
+        con = connect()
         cur = con.cursor()
-
-        cur.execute('DROP TABLE IF EXISTS users;')
-        cur.execute("""
-            CREATE TABLE users(
-                id SERIAL PRIMARY KEY, 
-                username VARCHAR (100) NOT NULL, 
-                password VARCHAR (100) NOT NULL, 
-                email VARCHAR (70) NOT NULL UNIQUE, 
-                created_on TIMESTAMP NOT NULL, 
-                updated_on TIMESTAMP NOT NULL, 
-                deleted BOOLEAN,
-                is_admin BOOLEAN
-            );
-        """)
-
-        con.commit()
-
+        for statement in sql:
+            cur.execute(statement)
+            con.commit()
     finally:
         if con:
             con.close()
 
 
-def fill_db_table(user_count=5000):
+def fill_users_table(user_count=NUM_OF_USERS):
     """
-    TODO: move psycopg2.connect to db_utils
     :return:
     """
-    host = os.environ['POSTGRESQL_HOST']
-    database = os.environ['POSTGRESQL_DB']
-    user = os.environ['POSTGRESQL_USER']
-    password = os.environ['POSTGRESQL_PASSWORD']
-
     con = None
 
     try:
-        con = psycopg2.connect(host=host, database=database, user=user, password=password)
+        con = connect()
         cur = con.cursor()
-
         user_data = ("""
             INSERT INTO users (username, password, email, created_on, updated_on, deleted, is_admin) 
             VALUES (%s, %s, %s, %s, %s, %s, %s);
@@ -124,17 +132,16 @@ def fill_db_table(user_count=5000):
                 ]
             )
             con.commit()
-
     finally:
         if con:
             con.close()
 
 
 def main():
-    print('Create table')
-    create_db_table()
-    print('Fill table')
-    fill_db_table()
+    print('Create tables structure')
+    create_db_table(SQL_)
+    print('Fill tables')
+    fill_users_table()
 
 
 if __name__ == '__main__':
